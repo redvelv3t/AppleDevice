@@ -8,29 +8,31 @@
   <meta name="color-scheme" content="light dark">
 </head>
 <body oncontextmenu="return false">
-  <main class="container" aria-live="polite">
+  <main class="container center-stage" aria-live="polite">
+    <!-- Shared thumbnail card (hidden until detection runs) -->
     <div class="thumbCard" id="thumbCard" hidden aria-hidden="true">
       <div class="thumbnail" id="thumbnail" ondragstart="return false"></div>
     </div>
 
-    <p class="caption" id="caption" hidden>Detecting device…</p>
+    <!-- Dynamic caption/specs (hidden until after first tap) -->
+    <p class="caption" id="caption" hidden>—</p>
+    <p class="specs" id="specs" hidden></p>
+    <p class="hint" id="hint" hidden></p>
 
-    <button id="actionBtn" class="btn btn-primary">
-      Get wallpaper
-    </button>
+    <!-- Primary action: ONLY visible on load; triggers first/only detection -->
+    <button id="actionBtn" class="btn btn-primary">Get Wallpaper</button>
 
+    <!-- Copy helper: ONLY appears when iPhone is NOT recognized -->
     <div class="actions-row" id="auxActions" hidden>
-      <button id="copyBtn" class="btn btn-ghost">Copy my screen size</button>
-      <a id="sendLink" class="btn btn-ghost" href="#" rel="noopener">Send screen size</a>
+      <button id="copyBtn" class="btn btn-ghost">Copy Screen Size</button>
+      <span class="aftercopy" id="afterCopy" aria-live="polite"></span>
     </div>
 
-    <p class="specs" id="specs" hidden></p>
-
-    <footer class="footer">v1.0.1 • 2025‑08‑12 • iPhone‑only</footer>
+    <footer class="footer">v1.0.2 • 2025‑08‑13 • iPhone‑only</footer>
   </main>
 
 <script>
-/* ------------------ helpers ------------------ */
+/* ============ helpers ============ */
 function isIPadLike(ua, platform, maxTouch) {
   const looksLikeMac = /Macintosh/i.test(ua) || /Mac/i.test(platform || "");
   return looksLikeMac && (maxTouch || 0) > 1; // iPadOS posing as Mac
@@ -48,7 +50,7 @@ function normalizeWH(w, h) {
 }
 function approxEqual(a, b, tol=1) { return Math.abs(a-b) <= tol; }
 
-/* ------------------ detection ------------------ */
+/* ============ detection ============ */
 function detectAppleThing() {
   const ua = navigator.userAgent || "";
   const platform = (navigator.platform || (navigator.userAgentData && navigator.userAgentData.platform)) || "";
@@ -69,7 +71,7 @@ function detectAppleThing() {
   return { type, osVersion, w, h, dpr, nativeW, nativeH, ua, maxTouch };
 }
 
-/* ------------------ iPhone family map ------------------ */
+/* ============ iPhone family map ============ */
 const FAMILY_MAP = [
   { w:320, h:568, dpr:2,  key:"iphone-4.0@2x.jpg",           label:'iPhone 4.0″ family' },
   { w:375, h:667, dpr:2,  key:"iphone-4.7@2x.jpg",           label:'iPhone 4.7″ family' },
@@ -92,99 +94,89 @@ function matchIPhoneFamily(w, h, dpr) {
   return null;
 }
 
-/* ------------------ UI wiring ------------------ */
-const thumbCard = document.getElementById('thumbCard');
+/* ============ UI wiring ============ */
 const captionEl = document.getElementById('caption');
-const btn = document.getElementById('actionBtn');
 const specsEl = document.getElementById('specs');
+const hintEl = document.getElementById('hint');
+const thumbCard = document.getElementById('thumbCard');
 const aux = document.getElementById('auxActions');
 const copyBtn = document.getElementById('copyBtn');
-const sendLink = document.getElementById('sendLink');
-
-let hasDetected = false;
-let currentHref = null;
+const afterCopy = document.getElementById('afterCopy');
+const btn = document.getElementById('actionBtn');
+const container = document.querySelector('.container');
 
 function setButton(label, href, disabled=false) {
   btn.textContent = label;
-  currentHref = href || null;
+  if (href) {
+    btn.onclick = () => { window.location.href = href; };
+  } else {
+    btn.onclick = null;
+  }
   btn.disabled = !!disabled;
 }
 
-function makeIssueURL(payload) {
-  const base = 'https://github.com/your-user/your-repo/issues/new';
-  const title = encodeURIComponent(`Add support: ${payload.w}×${payload.h} CSS, DPR ${payload.dpr}`);
-  const body = encodeURIComponent(
-`Device type guess: ${payload.type}
-CSS size: ${payload.w}×${payload.h}
-Native size: ${payload.nativeW}×${payload.nativeH}
-DPR: ${payload.dpr}
-iOS/iPadOS: ${payload.osVersion || 'unknown'}
-UA: ${payload.ua}
-maxTouchPoints: ${payload.maxTouch}
-Page version: v1.0.1 (2025-08-12)`
-  );
-  return `${base}?title=${title}&body=${body}`;
-}
+/* Run detection ONLY when user taps the button */
+function runDetectionOnce() {
+  // Reveal UI elements only after tap
+  thumbCard.hidden = false;
+  captionEl.hidden = false;
 
-function doDetectionAndReveal() {
   const info = detectAppleThing();
   const cssLabel = `${info.w}×${info.h} CSS`;
   const nativeLabel = `${info.nativeW}×${info.nativeH} px`;
   const dprLabel = `DPR ${info.dpr}`;
   const specsStr = `${cssLabel} • ${nativeLabel} • ${dprLabel}${info.osVersion ? ` • iOS/iPadOS ${info.osVersion}` : ''}`;
 
-  // reveal UI bits now
-  thumbCard.hidden = false;
-  captionEl.hidden = false;
+  // Default: hide helpers/specs; keep centered layout unless we need to show more
+  aux.hidden = true;
+  specsEl.hidden = true;
+  hintEl.hidden = true;
+  afterCopy.textContent = "";
 
   if (info.type === 'iPhone') {
     const fam = matchIPhoneFamily(info.w, info.h, info.dpr);
-    specsEl.hidden = false;
-    specsEl.textContent = specsStr;
 
     if (fam) {
-      captionEl.textContent = `Detected: ${fam.label}`;
-      setButton('Download wallpaper', `wallpaper/${fam.key}`, false);
-      aux.hidden = true; // Copy/Send ONLY when not detected
+      // Immediately route to the correct wallpaper (no extra UI needed)
+      window.location.href = `wallpaper/${fam.key}`;
+      return;
     } else {
+      // Not recognized: show preview + specs and ONLY the copy helper
       captionEl.textContent = 'Could not identify device';
-      setButton('Use original wallpaper', 'wallpaper/wallpaper-master.jpg', false);
-      aux.hidden = false; // show helpers ONLY now
+      specsEl.hidden = false;
+      specsEl.textContent = specsStr;
+
+      // Main button should still fetch the original wallpaper (still labeled "Get Wallpaper")
+      setButton('Get Wallpaper', 'wallpaper/wallpaper-master.jpg', false);
+
+      // Show copy helper ONLY in this failure state
+      aux.hidden = false;
       const clip = `iPhone: unknown • ${cssLabel} • ${nativeLabel} • ${dprLabel} • UA: ${info.ua}`;
       copyBtn.onclick = async () => {
         try {
           await navigator.clipboard.writeText(clip);
-          copyBtn.textContent = 'Copied!';
-          setTimeout(()=>copyBtn.textContent='Copy my screen size', 1500);
+          afterCopy.textContent = 'send this to prymus';
         } catch {
-          copyBtn.textContent = 'Copy failed';
-          setTimeout(()=>copyBtn.textContent='Copy my screen size', 1500);
+          afterCopy.textContent = 'copy failed — try again';
         }
       };
-      sendLink.href = makeIssueURL(info);
+
+      // Exit center stage so the card/caption/buttons have breathing room
+      container.classList.remove('center-stage');
     }
   } else if (info.type === 'iPad') {
     captionEl.textContent = 'iPad support coming soon 👀';
-    setButton('iPad not supported yet', null, true);
-    specsEl.hidden = true;
-    aux.hidden = true; // never show on iPad
+    setButton('Get Wallpaper', null, true); // keep primary centered, but disabled
+    container.classList.remove('center-stage');
   } else {
     captionEl.textContent = 'This tool is for iPhone. Desktop support coming soon.';
-    setButton('Desktop not supported yet', null, true);
-    specsEl.hidden = true;
-    aux.hidden = true; // never show on desktop
+    setButton('Get Wallpaper', null, true);
+    container.classList.remove('center-stage');
   }
 }
 
-btn.addEventListener('click', () => {
-  if (!hasDetected) {
-    hasDetected = true;
-    doDetectionAndReveal(); // first tap: detect & reveal UI
-  } else if (currentHref) {
-    // subsequent taps: go to target if available
-    window.location.href = currentHref;
-  }
-});
+// Only run once, on the first tap
+btn.addEventListener('click', runDetectionOnce, { once: true });
 </script>
 </body>
 </html>
