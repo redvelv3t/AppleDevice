@@ -1,101 +1,96 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>AC Wallpaper</title>
-  <link rel="stylesheet" href="style.css" />
-  <meta name="color-scheme" content="light dark">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Wallpaper Picker</title>
+  <link rel="stylesheet" href="style.css" />
+  <meta name="color-scheme" content="light dark">
 </head>
 <body oncontextmenu="return false">
-  <main class="container" aria-live="polite">
-    <div class="thumbCard" aria-hidden="true">
-      <div class="thumbnail" id="thumbnail"
-           ondragstart="return false"></div>
-    </div>
+  <main class="container" aria-live="polite">
+    <div class="thumbCard" aria-hidden="true">
+      <div class="thumbnail" id="thumbnail"
+           ondragstart="return false"></div>
+    </div>
 
-    <p class="caption" id="caption">Detecting device…</p>
+    <p class="caption" id="caption">Detecting device…</p>
 
-    <button id="actionBtn" class="btn btn-primary" disabled>
-      Please wait
-    </button>
+    <button id="actionBtn" class="btn btn-primary" disabled>
+      Please wait
+    </button>
 
-    <div class="actions-row" id="auxActions" hidden>
-      <button id="copyBtn" class="btn btn-ghost">Copy my screen size</button>
-      <a id="sendLink" class="btn btn-ghost" href="#" rel="noopener">Send screen size</a>
-    </div>
+    <div class="actions-row" id="auxActions" hidden>
+      <button id="copyBtn" class="btn btn-ghost">Copy my screen size</button>
+      <a id="sendLink" class="btn btn-ghost" href="#" rel="noopener">Send screen size</a>
+    </div>
 
-    <p class="specs" id="specs" hidden></p>
+    <p class="specs" id="specs" hidden></p>
 
-    <footer class="footer">v1.0 • 2025‑08‑12 • iPhone‑only</footer>
-  </main>
+    <footer class="footer">v1.0 • 2025‑08‑12 • iPhone‑only</footer>
+  </main>
 
 <script>
-/* ------------------ helpers ------------------ */
 function isIPadLike(ua, platform, maxTouch) {
-  const looksLikeMac = /Macintosh/i.test(ua) || /Mac/i.test(platform || "");
-  return looksLikeMac && (maxTouch || 0) > 1; // iPadOS posing as Mac
+  const looksLikeMac = /Macintosh/i.test(ua) || /Mac/i.test(platform || "");
+  return looksLikeMac && (maxTouch || 0) > 1;
 }
 function getIOSVersion(ua) {
-  const m1 = /OS (\d+)[._](\d+)(?:[._](\d+))?/.exec(ua);
-  if (m1) return [m1[1], m1[2], m1[3]].filter(Boolean).join(".");
-  const m2 = /Version\/(\d+)\.(\d+)(?:\.(\d+))?/.exec(ua);
-  if (m2 && /Safari/i.test(ua)) return [m2[1], m2[2], m2[3]].filter(Boolean).join(".");
-  return null;
+  const m1 = /OS (\d+)[._](\d+)(?:[._](\d+))?/.exec(ua);
+  if (m1) return [m1[1], m1[2], m1[3]].filter(Boolean).join(".");
+  const m2 = /Version\/(\d+)\.(\d+)(?:\.(\d+))?/.exec(ua);
+  if (m2 && /Safari/i.test(ua)) return [m2[1], m2[2], m2[3]].filter(Boolean).join(".");
+  return null;
 }
 function normalizeWH(w, h) {
-  const min = Math.min(w, h), max = Math.max(w, h);
-  return { w:min, h:max };
+  const min = Math.min(w, h), max = Math.max(w, h);
+  return { w:min, h:max };
 }
 function approxEqual(a, b, tol=1) { return Math.abs(a-b) <= tol; }
 
-/* ------------------ detection ------------------ */
 function detectAppleThing() {
-  const ua = navigator.userAgent || "";
-  const platform = (navigator.platform || (navigator.userAgentData && navigator.userAgentData.platform)) || "";
-  const maxTouch = navigator.maxTouchPoints || 0;
+  const ua = navigator.userAgent || "";
+  const platform = (navigator.platform || (navigator.userAgentData && navigator.userAgentData.platform)) || "";
+  const maxTouch = navigator.maxTouchPoints || 0;
 
-  let type = null;
-  if (/iPhone/i.test(ua)) type = "iPhone";
-  else if (/iPad/i.test(ua)) type = "iPad";
-  else if (isIPadLike(ua, platform, maxTouch)) type = "iPad";
-  else type = "Other";
+  let type = null;
+  if (/iPhone/i.test(ua)) type = "iPhone";
+  else if (/iPad/i.test(ua)) type = "iPad";
+  else if (isIPadLike(ua, platform, maxTouch)) type = "iPad";
+  else type = "Other";
 
-  const osVersion = getIOSVersion(ua) || null;
+  const osVersion = getIOSVersion(ua) || null;
 
-  const dpr = window.devicePixelRatio || 1;
-  const { w, h } = normalizeWH(window.screen.width, window.screen.height);
-  const nativeW = Math.round(w * dpr), nativeH = Math.round(h * dpr);
+  const dpr = window.devicePixelRatio || 1;
+  const { w, h } = normalizeWH(window.screen.width, window.screen.height);
+  const nativeW = Math.round(w * dpr), nativeH = Math.round(h * dpr);
 
-  return { type, osVersion, w, h, dpr, nativeW, nativeH, ua, maxTouch };
+  return { type, osVersion, w, h, dpr, nativeW, nativeH, ua, maxTouch };
 }
 
-/* ------------------ iPhone family map ------------------ */
-/* CSS logical size (portrait) + DPR → filename + label */
 const FAMILY_MAP = [
-  { w:320, h:568, dpr:2,  key:"iphone-4.0@2x.jpg",           label:'iPhone 4.0″ family' },
-  { w:375, h:667, dpr:2,  key:"iphone-4.7@2x.jpg",           label:'iPhone 4.7″ family' },
-  { w:414, h:736, dpr:3,  key:"iphone-5.5@3x.jpg",           label:'iPhone 5.5″ Plus family' },
-  { w:375, h:812, dpr:3,  key:"iphone-5.8@3x.jpg",           label:'iPhone 5.8″ family' },
-  { w:414, h:896, dpr:2,  key:"iphone-6.1-old@2x.jpg",       label:'iPhone 6.1″ (XR/11) family' },
-  { w:414, h:896, dpr:3,  key:"iphone-6.5@3x.jpg",           label:'iPhone 6.5″ family' },
-  { w:360, h:780, dpr:3,  key:"iphone-5.4@3x.jpg",           label:'iPhone 5.4″ mini family' },
-  { w:390, h:844, dpr:3,  key:"iphone-6.1@3x.jpg",           label:'iPhone 6.1″ (12/13/14/15/16) family' },
-  { w:428, h:926, dpr:3,  key:"iphone-6.7@3x.jpg",           label:'iPhone 6.7″ (12–16 Plus/Pro Max) family' },
-  { w:393, h:852, dpr:3,  key:"iphone-6.1-pro@3x.jpg",       label:'iPhone 6.1″ Pro family' },
-  { w:430, h:932, dpr:3,  key:"iphone-6.7-pro-max@3x.jpg",   label:'iPhone 6.7″ Pro Max family' },
+  { w:320, h:568, dpr:2,  key:"iphone-4.0@2x.jpg",           label:'iPhone 4.0″ family' },
+  { w:375, h:667, dpr:2,  key:"iphone-4.7@2x.jpg",           label:'iPhone 4.7″ family' },
+  { w:414, h:736, dpr:3,  key:"iphone-5.5@3x.jpg",           label:'iPhone 5.5″ Plus family' },
+  { w:375, h:812, dpr:3,  key:"iphone-5.8@3x.jpg",           label:'iPhone 5.8″ family' },
+  { w:414, h:896, dpr:2,  key:"iphone-6.1-old@2x.jpg",       label:'iPhone 6.1″ (XR/11) family' },
+  { w:414, h:896, dpr:3,  key:"iphone-6.5@3x.jpg",           label:'iPhone 6.5″ family' },
+  { w:360, h:780, dpr:3,  key:"iphone-5.4@3x.jpg",           label:'iPhone 5.4″ mini family' },
+  { w:390, h:844, dpr:3,  key:"iphone-6.1@3x.jpg",           label:'iPhone 6.1″ (12/13/14/15/16) family' },
+  { w:428, h:926, dpr:3,  key:"iphone-6.7@3x.jpg",           label:'iPhone 6.7″ (12–16 Plus/Pro Max) family' },
+  { w:393, h:852, dpr:3,  key:"iphone-6.1-pro@3x.jpg",       label:'iPhone 6.1″ Pro family' },
+  { w:430, h:932, dpr:3,  key:"iphone-6.7-pro-max@3x.jpg",   label:'iPhone 6.7″ Pro Max family' },
 ];
 
 function matchIPhoneFamily(w, h, dpr) {
-  for (const f of FAMILY_MAP) {
-    if (approxEqual(f.w, w) && approxEqual(f.h, h) && approxEqual(f.dpr, dpr, 0.25)) {
-      return f;
-    }
-  }
-  return null;
+  for (const f of FAMILY_MAP) {
+    if (approxEqual(f.w, w) && approxEqual(f.h, h) && approxEqual(f.dpr, dpr, 0.25)) {
+      return f;
+    }
+  }
+  return null;
 }
 
-/* ------------------ UI wiring ------------------ */
 const captionEl = document.getElementById('caption');
 const btn = document.getElementById('actionBtn');
 const specsEl = document.getElementById('specs');
@@ -104,19 +99,19 @@ const copyBtn = document.getElementById('copyBtn');
 const sendLink = document.getElementById('sendLink');
 
 function setButton(label, href, disabled=false) {
-  btn.textContent = label;
-  if (href) {
-    btn.onclick = () => { window.location.href = href; };
-  } else {
-    btn.onclick = null;
-  }
-  btn.disabled = !!disabled;
+  btn.textContent = label;
+  if (href) {
+    btn.onclick = () => { window.location.href = href; };
+  } else {
+    btn.onclick = null;
+  }
+  btn.disabled = !!disabled;
 }
 
 function makeIssueURL(payload) {
-  const base = 'https://github.com/your-user/your-repo/issues/new';
-  const title = encodeURIComponent(`Add support: ${payload.w}×${payload.h} CSS, DPR ${payload.dpr}`);
-  const body = encodeURIComponent(
+  const base = 'https://github.com/your-user/your-repo/issues/new';
+  const title = encodeURIComponent(`Add support: ${payload.w}×${payload.h} CSS, DPR ${payload.dpr}`);
+  const body = encodeURIComponent(
 `Device type guess: ${payload.type}
 CSS size: ${payload.w}×${payload.h}
 Native size: ${payload.nativeW}×${payload.nativeH}
@@ -125,65 +120,59 @@ iOS/iPadOS: ${payload.osVersion || 'unknown'}
 UA: ${payload.ua}
 maxTouchPoints: ${payload.maxTouch}
 Page version: v1.0 (2025-08-12)`
-  );
-  return `${base}?title=${title}&body=${body}`;
+  );
+  return `${base}?title=${title}&body=${body}`;
 }
 
 function render() {
-  const info = detectAppleThing();
-  const cssLabel = `${info.w}×${info.h} CSS`;
-  const nativeLabel = `${info.nativeW}×${info.nativeH} px`;
-  const dprLabel = `DPR ${info.dpr}`;
+  const info = detectAppleThing();
+  const cssLabel = `${info.w}×${info.h} CSS`;
+  const nativeLabel = `${info.nativeW}×${info.nativeH} px`;
+  const dprLabel = `DPR ${info.dpr}`;
+  const specsStr = `${cssLabel} • ${nativeLabel} • ${dprLabel}${info.osVersion ? ` • iOS/iPadOS ${info.osVersion}` : ''}`;
 
-  // Always show specs for iPhone; for others, keep it hidden
-  const specsStr = `${cssLabel} • ${nativeLabel} • ${dprLabel}${info.osVersion ? ` • iOS/iPadOS ${info.osVersion}` : ''}`;
+  if (info.type === 'iPhone') {
+    const fam = matchIPhoneFamily(info.w, info.h, info.dpr);
 
-  if (info.type === 'iPhone') {
-    const fam = matchIPhoneFamily(info.w, info.h, info.dpr);
+    specsEl.hidden = false;
+    specsEl.textContent = specsStr;
 
-    specsEl.hidden = false;
-    specsEl.textContent = specsStr;
+    if (fam) {
+      captionEl.textContent = `Detected: ${fam.label}`;
+      setButton('Get wallpaper', `wallpaper/${fam.key}`, false);
+      aux.hidden = true;
+    } else {
+      captionEl.textContent = 'Could not identify device';
+      setButton('Use original wallpaper', 'wallpaper/wallpaper-master.jpg', false);
+      aux.hidden = false;
 
-    if (fam) {
-      captionEl.textContent = `Detected: ${fam.label}`;
-      setButton('Get wallpaper', `wallpaper/${fam.key}`, false);
-      aux.hidden = true; // no need for copy/send
-    } else {
-      captionEl.textContent = 'Could not identify device';
-      setButton('Use original wallpaper', 'wallpaper/wallpaper-master.jpg', false);
-      // show copy/send helpers
-      aux.hidden = false;
-
-      const clip = `iPhone: unknown • ${cssLabel} • ${nativeLabel} • ${dprLabel} • UA: ${info.ua}`;
-      copyBtn.onclick = async () => {
-        try {
-          await navigator.clipboard.writeText(clip);
-          copyBtn.textContent = 'Copied!';
-          setTimeout(()=>copyBtn.textContent='Copy my screen size', 1500);
-        } catch {
-          copyBtn.textContent = 'Copy failed';
-          setTimeout(()=>copyBtn.textContent='Copy my screen size', 1500);
-        }
-      };
-      sendLink.href = makeIssueURL(info);
-    }
-  } else if (info.type === 'iPad') {
-    captionEl.textContent = 'iPad support coming soon 👀';
-    setButton('iPad not supported yet', null, true);
-    aux.hidden = true;
-    specsEl.hidden = true; // keep UI minimal for iPad
-  } else {
-    captionEl.textContent = 'This tool is for iPhone. Desktop support coming soon.';
-    setButton('Desktop not supported yet', null, true);
-    aux.hidden = true;
-    specsEl.hidden = true;
-  }
+      const clip = `iPhone: unknown • ${cssLabel} • ${nativeLabel} • ${dprLabel} • UA: ${info.ua}`;
+      copyBtn.onclick = async () => {
+        try {
+          await navigator.clipboard.writeText(clip);
+          copyBtn.textContent = 'Copied!';
+          setTimeout(()=>copyBtn.textContent='Copy my screen size', 1500);
+        } catch {
+          copyBtn.textContent = 'Copy failed';
+          setTimeout(()=>copyBtn.textContent='Copy my screen size', 1500);
+        }
+      };
+      sendLink.href = makeIssueURL(info);
+    }
+  } else if (info.type === 'iPad') {
+    captionEl.textContent = 'iPad support coming soon 👀';
+    setButton('iPad not supported yet', null, true);
+    aux.hidden = true;
+    specsEl.hidden = true;
+  } else {
+    captionEl.textContent = 'This tool is for iPhone. Desktop support coming soon.';
+    setButton('Desktop not supported yet', null, true);
+    aux.hidden = true;
+    specsEl.hidden = true;
+  }
 }
 
-// Re-run if the user rotates the phone
 window.addEventListener('orientationchange', () => setTimeout(render, 250), { passive:true });
-
-// Initial run
 render();
 </script>
 </body>
