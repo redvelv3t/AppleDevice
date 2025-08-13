@@ -9,15 +9,14 @@
 </head>
 <body oncontextmenu="return false">
   <main class="container" aria-live="polite">
-    <div class="thumbCard" aria-hidden="true">
-      <div class="thumbnail" id="thumbnail"
-           ondragstart="return false"></div>
+    <div class="thumbCard" id="thumbCard" hidden aria-hidden="true">
+      <div class="thumbnail" id="thumbnail" ondragstart="return false"></div>
     </div>
 
-    <p class="caption" id="caption">Detecting device…</p>
+    <p class="caption" id="caption" hidden>Detecting device…</p>
 
-    <button id="actionBtn" class="btn btn-primary" disabled>
-      Please wait
+    <button id="actionBtn" class="btn btn-primary">
+      Get wallpaper
     </button>
 
     <div class="actions-row" id="auxActions" hidden>
@@ -27,13 +26,14 @@
 
     <p class="specs" id="specs" hidden></p>
 
-    <footer class="footer">v1.0 • 2025‑08‑12 • iPhone‑only</footer>
+    <footer class="footer">v1.0.1 • 2025‑08‑12 • iPhone‑only</footer>
   </main>
 
 <script>
+/* ------------------ helpers ------------------ */
 function isIPadLike(ua, platform, maxTouch) {
   const looksLikeMac = /Macintosh/i.test(ua) || /Mac/i.test(platform || "");
-  return looksLikeMac && (maxTouch || 0) > 1;
+  return looksLikeMac && (maxTouch || 0) > 1; // iPadOS posing as Mac
 }
 function getIOSVersion(ua) {
   const m1 = /OS (\d+)[._](\d+)(?:[._](\d+))?/.exec(ua);
@@ -48,6 +48,7 @@ function normalizeWH(w, h) {
 }
 function approxEqual(a, b, tol=1) { return Math.abs(a-b) <= tol; }
 
+/* ------------------ detection ------------------ */
 function detectAppleThing() {
   const ua = navigator.userAgent || "";
   const platform = (navigator.platform || (navigator.userAgentData && navigator.userAgentData.platform)) || "";
@@ -68,6 +69,7 @@ function detectAppleThing() {
   return { type, osVersion, w, h, dpr, nativeW, nativeH, ua, maxTouch };
 }
 
+/* ------------------ iPhone family map ------------------ */
 const FAMILY_MAP = [
   { w:320, h:568, dpr:2,  key:"iphone-4.0@2x.jpg",           label:'iPhone 4.0″ family' },
   { w:375, h:667, dpr:2,  key:"iphone-4.7@2x.jpg",           label:'iPhone 4.7″ family' },
@@ -81,7 +83,6 @@ const FAMILY_MAP = [
   { w:393, h:852, dpr:3,  key:"iphone-6.1-pro@3x.jpg",       label:'iPhone 6.1″ Pro family' },
   { w:430, h:932, dpr:3,  key:"iphone-6.7-pro-max@3x.jpg",   label:'iPhone 6.7″ Pro Max family' },
 ];
-
 function matchIPhoneFamily(w, h, dpr) {
   for (const f of FAMILY_MAP) {
     if (approxEqual(f.w, w) && approxEqual(f.h, h) && approxEqual(f.dpr, dpr, 0.25)) {
@@ -91,6 +92,8 @@ function matchIPhoneFamily(w, h, dpr) {
   return null;
 }
 
+/* ------------------ UI wiring ------------------ */
+const thumbCard = document.getElementById('thumbCard');
 const captionEl = document.getElementById('caption');
 const btn = document.getElementById('actionBtn');
 const specsEl = document.getElementById('specs');
@@ -98,13 +101,12 @@ const aux = document.getElementById('auxActions');
 const copyBtn = document.getElementById('copyBtn');
 const sendLink = document.getElementById('sendLink');
 
+let hasDetected = false;
+let currentHref = null;
+
 function setButton(label, href, disabled=false) {
   btn.textContent = label;
-  if (href) {
-    btn.onclick = () => { window.location.href = href; };
-  } else {
-    btn.onclick = null;
-  }
+  currentHref = href || null;
   btn.disabled = !!disabled;
 }
 
@@ -119,33 +121,35 @@ DPR: ${payload.dpr}
 iOS/iPadOS: ${payload.osVersion || 'unknown'}
 UA: ${payload.ua}
 maxTouchPoints: ${payload.maxTouch}
-Page version: v1.0 (2025-08-12)`
+Page version: v1.0.1 (2025-08-12)`
   );
   return `${base}?title=${title}&body=${body}`;
 }
 
-function render() {
+function doDetectionAndReveal() {
   const info = detectAppleThing();
   const cssLabel = `${info.w}×${info.h} CSS`;
   const nativeLabel = `${info.nativeW}×${info.nativeH} px`;
   const dprLabel = `DPR ${info.dpr}`;
   const specsStr = `${cssLabel} • ${nativeLabel} • ${dprLabel}${info.osVersion ? ` • iOS/iPadOS ${info.osVersion}` : ''}`;
 
+  // reveal UI bits now
+  thumbCard.hidden = false;
+  captionEl.hidden = false;
+
   if (info.type === 'iPhone') {
     const fam = matchIPhoneFamily(info.w, info.h, info.dpr);
-
     specsEl.hidden = false;
     specsEl.textContent = specsStr;
 
     if (fam) {
       captionEl.textContent = `Detected: ${fam.label}`;
-      setButton('Get wallpaper', `wallpaper/${fam.key}`, false);
-      aux.hidden = true;
+      setButton('Download wallpaper', `wallpaper/${fam.key}`, false);
+      aux.hidden = true; // Copy/Send ONLY when not detected
     } else {
       captionEl.textContent = 'Could not identify device';
       setButton('Use original wallpaper', 'wallpaper/wallpaper-master.jpg', false);
-      aux.hidden = false;
-
+      aux.hidden = false; // show helpers ONLY now
       const clip = `iPhone: unknown • ${cssLabel} • ${nativeLabel} • ${dprLabel} • UA: ${info.ua}`;
       copyBtn.onclick = async () => {
         try {
@@ -162,18 +166,25 @@ function render() {
   } else if (info.type === 'iPad') {
     captionEl.textContent = 'iPad support coming soon 👀';
     setButton('iPad not supported yet', null, true);
-    aux.hidden = true;
     specsEl.hidden = true;
+    aux.hidden = true; // never show on iPad
   } else {
     captionEl.textContent = 'This tool is for iPhone. Desktop support coming soon.';
     setButton('Desktop not supported yet', null, true);
-    aux.hidden = true;
     specsEl.hidden = true;
+    aux.hidden = true; // never show on desktop
   }
 }
 
-window.addEventListener('orientationchange', () => setTimeout(render, 250), { passive:true });
-render();
+btn.addEventListener('click', () => {
+  if (!hasDetected) {
+    hasDetected = true;
+    doDetectionAndReveal(); // first tap: detect & reveal UI
+  } else if (currentHref) {
+    // subsequent taps: go to target if available
+    window.location.href = currentHref;
+  }
+});
 </script>
 </body>
 </html>
