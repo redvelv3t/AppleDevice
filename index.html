@@ -21,7 +21,7 @@
 
 
 <script>
-/* ===== DO NOT CHANGE STYLE — logic only ===== */
+/* ===== Logic patch: robust download flow, UI unchanged ===== */
 
 /* --- helpers --- */
 function wallpaperURL(file) {
@@ -40,14 +40,43 @@ function getIOSVersion(ua) {
   return null;
 }
 function approxEqual(a,b,t){ return Math.abs(a-b) <= t; }
-function canUseDownloadAttr(){ const a=document.createElement('a'); return 'download' in a; }
-function downloadOrOpen(url, filename){
-  const a=document.createElement('a');
-  a.href=url;
-  if (canUseDownloadAttr()) a.setAttribute('download', filename||'');
-  a.target='_blank'; a.rel='noopener';
-  document.body.appendChild(a); a.click(); a.remove();
+
+/* Try blob-download first, then attribute, then open */
+async function forceDownload(url, filename){
+  try {
+    const res = await fetch(url, { mode: 'cors', cache: 'no-cache' });
+    if (!res.ok) throw new Error('fetch failed');
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = blobUrl;
+    a.setAttribute('download', filename || '');
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(()=>URL.revokeObjectURL(blobUrl), 1000);
+    a.remove();
+    return;
+  } catch(e) {
+    // fallthrough
+  }
+  try {
+    const a = document.createElement('a');
+    a.href = url;
+    a.setAttribute('download', filename || '');
+    a.target = '_blank';
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    return;
+  } catch(e) {
+    // final fallback
+    window.open(url, '_blank', 'noopener');
+  }
 }
+
+/* --- robust size read & detection --- */
 function readLogicalSize(){
   const pairs = [
     [window.screen.width, window.screen.height],
@@ -78,7 +107,7 @@ function detectAppleThing(){
   return { type, osVersion, w:css.w, h:css.h, dpr, nativeW, nativeH, ua, maxTouch };
 }
 
-/* --- exact family map (matches your wallpaper folder filenames) --- */
+/* --- exact family map (wallpaper/ filenames) --- */
 const FAMILY_MAP = [
   { w:320, h:568, dpr:2,  file:"iphone-4.0@2x.jpg",         label:'iPhone 4.0″ family' },
   { w:375, h:667, dpr:2,  file:"iphone-4.7@2x.jpg",         label:'iPhone 4.7″ family' },
@@ -100,12 +129,12 @@ function matchIPhoneFamily(w,h,dpr){
   return null;
 }
 
-/* --- two-step UI wiring --- */
+/* --- two-step UI --- */
 (function(){
   const captionEl = document.getElementById('caption');
   const specsEl   = document.getElementById('specs');
   const thumbCard = document.getElementById('thumbCard');
-  const aux       = document.getElementById('auxActions');   // container for Copy Screen Size
+  const aux       = document.getElementById('auxActions');
   const copyBtn   = document.getElementById('copyBtn');
   const afterCopy = document.getElementById('afterCopy');
   const btn       = document.getElementById('actionBtn');
@@ -114,9 +143,14 @@ function matchIPhoneFamily(w,h,dpr){
   let hasDetected = false;
   let downloadTarget = null;
 
+  async function handleDownload() {
+    if (!downloadTarget) return;
+    await forceDownload(downloadTarget.url, downloadTarget.filename);
+  }
+
   function runDetection(){
-    thumbCard && (thumbCard.hidden = false);
-    captionEl && (captionEl.hidden = false);
+    if (thumbCard) thumbCard.hidden = false;
+    if (captionEl) captionEl.hidden = false;
 
     const info = detectAppleThing();
     const cssLabel    = `${info.w}×${info.h} CSS`;
@@ -151,7 +185,6 @@ function matchIPhoneFamily(w,h,dpr){
       hasDetected = true;
       if (container && container.classList.contains('center-stage')) container.classList.remove('center-stage');
     } else {
-      // iPad or Desktop → master wallpaper
       if (captionEl) captionEl.textContent = (info.type === 'iPad')
         ? 'iPad support coming soon 👀'
         : 'This tool is for iPhone. Desktop support coming soon.';
@@ -163,9 +196,9 @@ function matchIPhoneFamily(w,h,dpr){
   }
 
   if (btn) {
-    btn.addEventListener('click', () => {
+    btn.addEventListener('click', async () => {
       if (!hasDetected) runDetection();
-      else if (downloadTarget) downloadOrOpen(downloadTarget.url, downloadTarget.filename);
+      else await handleDownload();
     }, { once:false });
   }
 })();
