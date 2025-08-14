@@ -3,43 +3,42 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Prymus</title>
+  <title>Wallpaper Picker</title>
   <link rel="stylesheet" href="style.css" />
   <meta name="color-scheme" content="light dark">
 </head>
 <body oncontextmenu="return false">
   <main class="container center-stage" aria-live="polite">
-    <!-- Shared thumbnail (hidden until first tap) -->
+    <!-- Shared thumbnail card (hidden until first tap) -->
     <div class="thumbCard" id="thumbCard" hidden aria-hidden="true">
       <div class="thumbnail" id="thumbnail" ondragstart="return false"></div>
     </div>
 
-    <!-- Dynamic caption + specs (hidden until first tap) -->
+    <!-- Dynamic caption/specs (hidden until after first tap) -->
     <p class="caption" id="caption" hidden>—</p>
     <p class="specs" id="specs" hidden></p>
 
-    <!-- Primary action: single CTA -->
+    <!-- Primary action: ONLY visible on load; triggers detection -->
     <button id="actionBtn" class="btn btn-primary">Get Wallpaper</button>
 
-    <!-- Copy helper ONLY for unknown iPhone -->
+    <!-- Copy helper: ONLY appears when iPhone is NOT recognized -->
     <div class="actions-row" id="auxActions" hidden>
       <button id="copyBtn" class="btn btn-ghost">Copy Screen Size</button>
       <span class="aftercopy" id="afterCopy" aria-live="polite"></span>
     </div>
 
-    <footer class="footer">v1.0.2c • iPhone‑only</footer>
+    <footer class="footer">v1.0.2d • iPhone‑only</footer>
   </main>
 
 <script>
-/* ================= helpers ================= */
+/* ============ helpers ============ */
 function wallpaperURL(file) {
-  // Always point to local ./wallpaper/ next to index.html
   const base = new URL('./wallpaper/', location.href);
   return new URL(file, base).toString();
 }
 function isIPadLike(ua, platform, maxTouch) {
   const looksLikeMac = /Macintosh/i.test(ua) || /Mac/i.test(platform || "");
-  return looksLikeMac && (maxTouch || 0) > 1; // iPadOS pretending to be Mac
+  return looksLikeMac && (maxTouch || 0) > 1; // iPadOS posing as Mac
 }
 function getIOSVersion(ua) {
   const m1 = /OS (\d+)[._](\d+)(?:[._](\d+))?/.exec(ua);
@@ -48,7 +47,10 @@ function getIOSVersion(ua) {
   if (m2 && /Safari/i.test(ua)) return [m2[1], m2[2], m2[3]].filter(Boolean).join(".");
   return null;
 }
-function normalizeWH(w, h) { const min = Math.min(w, h), max = Math.max(w, h); return { w:min, h:max }; }
+function normalizeWH(w, h) {
+  const min = Math.min(w, h), max = Math.max(w, h);
+  return { w:min, h:max };
+}
 function approxEqual(a, b, tol=1) { return Math.abs(a-b) <= tol; }
 function canUseDownloadAttr() { const a = document.createElement('a'); return 'download' in a; }
 function downloadOrOpen(url, filename) {
@@ -60,25 +62,28 @@ function downloadOrOpen(url, filename) {
   document.body.appendChild(a); a.click(); a.remove();
 }
 
-/* ============== detection ============== */
+/* ============ detection ============ */
 function detectAppleThing() {
   const ua = navigator.userAgent || "";
   const platform = (navigator.platform || (navigator.userAgentData && navigator.userAgentData.platform)) || "";
   const maxTouch = navigator.maxTouchPoints || 0;
 
-  let type = 'Other';
+  let type = null;
   if (/iPhone/i.test(ua)) type = "iPhone";
   else if (/iPad/i.test(ua)) type = "iPad";
   else if (isIPadLike(ua, platform, maxTouch)) type = "iPad";
+  else type = "Other";
 
   const osVersion = getIOSVersion(ua) || null;
+
   const dpr = window.devicePixelRatio || 1;
   const { w, h } = normalizeWH(window.screen.width, window.screen.height);
   const nativeW = Math.round(w * dpr), nativeH = Math.round(h * dpr);
+
   return { type, osVersion, w, h, dpr, nativeW, nativeH, ua, maxTouch };
 }
 
-/* ===== EXACT iPhone family → filename map (matches your folder) ===== */
+/* ============ iPhone family map (matches your filenames) ============ */
 const FAMILY_MAP = [
   { w:320, h:568, dpr:2,  file:"iphone-4.0@2x.jpg",         label:'iPhone 4.0″ family' },
   { w:375, h:667, dpr:2,  file:"iphone-4.7@2x.jpg",         label:'iPhone 4.7″ family' },
@@ -94,12 +99,14 @@ const FAMILY_MAP = [
 ];
 function matchIPhoneFamily(w, h, dpr) {
   for (const f of FAMILY_MAP) {
-    if (approxEqual(f.w, w) && approxEqual(f.h, h) && approxEqual(f.dpr, dpr, 0.25)) return f;
+    if (approxEqual(f.w, w) && approxEqual(f.h, h) && approxEqual(f.dpr, dpr, 0.25)) {
+      return f;
+    }
   }
   return null;
 }
 
-/* ============== two‑step UI ============== */
+/* ============ two‑step UI ============ */
 const captionEl = document.getElementById('caption');
 const specsEl   = document.getElementById('specs');
 const thumbCard = document.getElementById('thumbCard');
@@ -113,6 +120,7 @@ let hasDetected = false;
 let downloadTarget = null;
 
 function runDetection() {
+  // Reveal UI elements after first tap
   thumbCard.hidden = false;
   captionEl.hidden = false;
 
@@ -122,6 +130,7 @@ function runDetection() {
   const dprLabel    = `DPR ${info.dpr}`;
   const specsStr    = `${cssLabel} • ${nativeLabel} • ${dprLabel}${info.osVersion ? ` • iOS/iPadOS ${info.osVersion}` : ''}`;
 
+  // Reset helpers
   aux.hidden = true;
   specsEl.hidden = true;
   afterCopy.textContent = "";
@@ -136,7 +145,8 @@ function runDetection() {
     } else {
       captionEl.textContent = 'Could not identify device';
       downloadTarget = { url: wallpaperURL('wallpaper-master.jpg'), filename: 'wallpaper-master.jpg' };
-      aux.hidden = false; // ONLY here
+      // Show copy helper ONLY here
+      aux.hidden = false;
       const clip = `iPhone: unknown • ${cssLabel} • ${nativeLabel} • ${dprLabel} • UA: ${info.ua}`;
       copyBtn.onclick = async () => {
         try { await navigator.clipboard.writeText(clip); afterCopy.textContent = 'send this to prymus'; }
@@ -147,7 +157,7 @@ function runDetection() {
     hasDetected = true;
     container.classList.remove('center-stage');
   } else {
-    // iPad or Desktop → master wallpaper
+    // iPad or Desktop → master wallpaper (non-supported devices)
     captionEl.textContent = (info.type === 'iPad')
       ? 'iPad support coming soon 👀'
       : 'This tool is for iPhone. Desktop support coming soon.';
