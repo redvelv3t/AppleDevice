@@ -21,185 +21,104 @@
 
 
 <script>
-/* ===== Logic patch: robust download flow, UI unchanged ===== */
+/* ===== Anchor-based download: reliable on iOS ===== */
 
-/* --- helpers --- */
-function wallpaperURL(file) {
-  const base = new URL('./wallpaper/', location.href);
-  return new URL(file, base).toString();
-}
-function isIPadLike(ua, platform, maxTouch) {
-  const looksLikeMac = /Macintosh/i.test(ua) || /Mac/i.test(platform || "");
-  return looksLikeMac && (maxTouch || 0) > 1;
-}
-function getIOSVersion(ua) {
-  const m1 = /OS (\d+)[._](\d+)(?:[._](\d+))?/.exec(ua);
-  if (m1) return [m1[1], m1[2], m1[3]].filter(Boolean).join(".");
-  const m2 = /Version\/(\d+)\.(\d+)(?:\.(\d+))?/.exec(ua);
-  if (m2 && /Safari/i.test(ua)) return [m2[1], m2[2], m2[3]].filter(Boolean).join(".");
-  return null;
-}
-function approxEqual(a,b,t){ return Math.abs(a-b) <= t; }
+/* helpers */
+function wallpaperURL(file){ const base = new URL('./wallpaper/', location.href); return new URL(file, base).toString(); }
+function isIPadLike(ua, platform, maxTouch){ const looksLikeMac=/Macintosh/i.test(ua)||/Mac/i.test(platform||""); return looksLikeMac && (maxTouch||0)>1; }
+function getIOSVersion(ua){ const m1=/OS (\d+)[._](\d+)(?:[._](\d+))?/.exec(ua); if(m1) return [m1[1],m1[2],m1[3]].filter(Boolean).join("."); const m2=/Version\/(\d+)\.(\d+)(?:\.(\d+))?/.exec(ua); if(m2 && /Safari/i.test(ua)) return [m2[1],m2[2],m2[3]].filter(Boolean).join("."); return null; }
+function approxEqual(a,b,t){ return Math.abs(a-b)<=t; }
+function readLogicalSize(){ const pairs=[[window.screen.width,window.screen.height],[window.innerWidth,window.innerHeight]]; let best={w:0,h:0}; for(const[pw,ph]of pairs){ if(!pw||!ph) continue; const w=Math.min(pw,ph),h=Math.max(pw,ph); if(w*h>best.w*best.h) best={w,h}; } return best; }
+function detectAppleThing(){ const ua=navigator.userAgent||""; const platform=(navigator.platform||(navigator.userAgentData&&navigator.userAgentData.platform))||""; const maxTouch=navigator.maxTouchPoints||0; let type='Other'; if(/iPhone/i.test(ua)) type="iPhone"; else if(/iPad/i.test(ua)) type="iPad"; else if(isIPadLike(ua,platform,maxTouch)) type="iPad"; const osVersion=getIOSVersion(ua)||null; const dpr=window.devicePixelRatio||1; const css=readLogicalSize(); const nativeW=Math.round(css.w*dpr), nativeH=Math.round(css.h*dpr); return { type, osVersion, w:css.w, h:css.h, dpr, nativeW, nativeH, ua, maxTouch }; }
 
-/* Try blob-download first, then attribute, then open */
-async function forceDownload(url, filename){
-  try {
-    const res = await fetch(url, { mode: 'cors', cache: 'no-cache' });
-    if (!res.ok) throw new Error('fetch failed');
-    const blob = await res.blob();
-    const blobUrl = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = blobUrl;
-    a.setAttribute('download', filename || '');
-    a.rel = 'noopener';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(()=>URL.revokeObjectURL(blobUrl), 1000);
-    a.remove();
-    return;
-  } catch(e) {
-    // fallthrough
-  }
-  try {
-    const a = document.createElement('a');
-    a.href = url;
-    a.setAttribute('download', filename || '');
-    a.target = '_blank';
-    a.rel = 'noopener';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    return;
-  } catch(e) {
-    // final fallback
-    window.open(url, '_blank', 'noopener');
-  }
-}
-
-/* --- robust size read & detection --- */
-function readLogicalSize(){
-  const pairs = [
-    [window.screen.width, window.screen.height],
-    [window.innerWidth, window.innerHeight]
-  ];
-  let best = {w:0,h:0};
-  for (const [a,b] of pairs){
-    if (!a || !b) continue;
-    const w = Math.min(a,b), h = Math.max(a,b);
-    if (w*h > best.w*best.h) best = {w, h};
-  }
-  return best;
-}
-function detectAppleThing(){
-  const ua = navigator.userAgent || "";
-  const platform = (navigator.platform || (navigator.userAgentData && navigator.userAgentData.platform)) || "";
-  const maxTouch = navigator.maxTouchPoints || 0;
-
-  let type = 'Other';
-  if (/iPhone/i.test(ua)) type = "iPhone";
-  else if (/iPad/i.test(ua)) type = "iPad";
-  else if (isIPadLike(ua, platform, maxTouch)) type = "iPad";
-
-  const osVersion = getIOSVersion(ua) || null;
-  const dpr = window.devicePixelRatio || 1;
-  const css = readLogicalSize();
-  const nativeW = Math.round(css.w*dpr), nativeH = Math.round(css.h*dpr);
-  return { type, osVersion, w:css.w, h:css.h, dpr, nativeW, nativeH, ua, maxTouch };
-}
-
-/* --- exact family map (wallpaper/ filenames) --- */
-const FAMILY_MAP = [
-  { w:320, h:568, dpr:2,  file:"iphone-4.0@2x.jpg",         label:'iPhone 4.0″ family' },
-  { w:375, h:667, dpr:2,  file:"iphone-4.7@2x.jpg",         label:'iPhone 4.7″ family' },
-  { w:414, h:736, dpr:3,  file:"iphone-5.5@3x.jpg",         label:'iPhone 5.5″ Plus family' },
-  { w:375, h:812, dpr:3,  file:"iphone-5.8@3x.jpg",         label:'iPhone 5.8″ family' },
-  { w:414, h:896, dpr:2,  file:"iphone-6.1-old@2x.jpg",     label:'iPhone 6.1″ (XR/11) family' },
-  { w:414, h:896, dpr:3,  file:"iphone-6.5@3x.jpg",         label:'iPhone 6.5″ family' },
-  { w:360, h:780, dpr:3,  file:"iphone-5.4@3x.jpg",         label:'iPhone 5.4″ mini family' },
-  { w:390, h:844, dpr:3,  file:"iphone-6.1@3x.jpg",         label:'iPhone 6.1″ (12/13/14/15/16) family' },
-  { w:428, h:926, dpr:3,  file:"iphone-6.7@3x.jpg",         label:'iPhone 6.7″ (12–16 Plus/Pro Max) family' },
-  { w:393, h:852, dpr:3,  file:"iphone-6.1-pro@3x.jpg",     label:'iPhone 6.1″ Pro family' },
-  { w:430, h:932, dpr:3,  file:"iphone-6.7-pro-max@3x.jpg", label:'iPhone 6.7″ Pro Max family' },
+/* family map -> exact filenames in ./wallpaper/ */
+const FAMILY_MAP=[
+  {w:320,h:568,dpr:2,  file:"iphone-4.0@2x.jpg",         label:"iPhone 4.0″ family"},
+  {w:375,h:667,dpr:2,  file:"iphone-4.7@2x.jpg",         label:"iPhone 4.7″ family"},
+  {w:414,h:736,dpr:3,  file:"iphone-5.5@3x.jpg",         label:"iPhone 5.5″ Plus family"},
+  {w:375,h:812,dpr:3,  file:"iphone-5.8@3x.jpg",         label:"iPhone 5.8″ family"},
+  {w:414,h:896,dpr:2,  file:"iphone-6.1-old@2x.jpg",     label:"iPhone 6.1″ (XR/11) family"},
+  {w:414,h:896,dpr:3,  file:"iphone-6.5@3x.jpg",         label:"iPhone 6.5″ family"},
+  {w:360,h:780,dpr:3,  file:"iphone-5.4@3x.jpg",         label:"iPhone 5.4″ mini family"},
+  {w:390,h:844,dpr:3,  file:"iphone-6.1@3x.jpg",         label:"iPhone 6.1″ (12/13/14/15/16) family"},
+  {w:428,h:926,dpr:3,  file:"iphone-6.7@3x.jpg",         label:"iPhone 6.7″ (12–16 Plus/Pro Max) family"},
+  {w:393,h:852,dpr:3,  file:"iphone-6.1-pro@3x.jpg",     label:"iPhone 6.1″ Pro family"},
+  {w:430,h:932,dpr:3,  file:"iphone-6.7-pro-max@3x.jpg", label:"iPhone 6.7″ Pro Max family"},
 ];
-function matchIPhoneFamily(w,h,dpr){
-  const TOL=2, DPR_TOL=0.25;
-  for (const f of FAMILY_MAP){
-    if (approxEqual(f.w,w,TOL) && approxEqual(f.h,h,TOL) && approxEqual(f.dpr,dpr,DPR_TOL)) return f;
-  }
-  return null;
-}
+function matchIPhoneFamily(w,h,dpr){ const TOL=2, DPR_TOL=0.25; for(const f of FAMILY_MAP){ if(approxEqual(f.w,w,TOL) && approxEqual(f.h,h,TOL) && approxEqual(f.dpr,dpr,DPR_TOL)) return f; } return null; }
 
-/* --- two-step UI --- */
+/* two-step flow bound to an <a id="actionBtn"> */
 (function(){
-  const captionEl = document.getElementById('caption');
-  const specsEl   = document.getElementById('specs');
-  const thumbCard = document.getElementById('thumbCard');
-  const aux       = document.getElementById('auxActions');
-  const copyBtn   = document.getElementById('copyBtn');
-  const afterCopy = document.getElementById('afterCopy');
-  const btn       = document.getElementById('actionBtn');
-  const container = document.querySelector('.container');
+  const captionEl=document.getElementById('caption');
+  const specsEl=document.getElementById('specs');
+  const thumbCard=document.getElementById('thumbCard');
+  const aux=document.getElementById('auxActions');
+  const copyBtn=document.getElementById('copyBtn');
+  const afterCopy=document.getElementById('afterCopy');
+  const link=document.getElementById('actionBtn'); // now an <a>
+  const container=document.querySelector('.container');
 
-  let hasDetected = false;
-  let downloadTarget = null;
-
-  async function handleDownload() {
-    if (!downloadTarget) return;
-    await forceDownload(downloadTarget.url, downloadTarget.filename);
+  let hasDetected=false;
+  let targetFile='wallpaper-master.jpg'; // safe default
+  function setDownload(file){
+    targetFile=file||'wallpaper-master.jpg';
+    const url=wallpaperURL(targetFile);
+    link.setAttribute('href', url);
+    link.setAttribute('download', targetFile); // if ignored, target=_blank still opens
+    link.setAttribute('target', '_blank');
+    link.setAttribute('rel', 'noopener');
+    link.textContent='Download';
   }
 
-  function runDetection(){
-    if (thumbCard) thumbCard.hidden = false;
-    if (captionEl) captionEl.hidden = false;
+  function runDetection(e){
+    if(e) e.preventDefault();
+    if(thumbCard) thumbCard.hidden=false;
+    if(captionEl) captionEl.hidden=false;
 
-    const info = detectAppleThing();
-    const cssLabel    = `${info.w}×${info.h} CSS`;
-    const nativeLabel = `${info.nativeW}×${info.nativeH} px`;
-    const dprLabel    = `DPR ${info.dpr}`;
-    const specsStr    = `${cssLabel} • ${nativeLabel} • ${dprLabel}${info.osVersion ? ` • iOS/iPadOS ${info.osVersion}` : ''}`;
+    const info=detectAppleThing();
+    const cssLabel=`${info.w}×${info.h} CSS`;
+    const nativeLabel=`${info.nativeW}×${info.nativeH} px`;
+    const dprLabel=`DPR ${info.dpr}`;
+    const specsStr=`${cssLabel} • ${nativeLabel} • ${dprLabel}${info.osVersion?` • iOS/iPadOS ${info.osVersion}`:''}`;
 
-    if (aux) aux.hidden = true;
-    if (specsEl) { specsEl.hidden = true; specsEl.textContent = ""; }
-    if (afterCopy) afterCopy.textContent = "";
+    if(aux) aux.hidden=true;
+    if(specsEl){ specsEl.hidden=true; specsEl.textContent=""; }
+    if(afterCopy) afterCopy.textContent="";
 
-    if (info.type === 'iPhone') {
-      const fam = matchIPhoneFamily(info.w, info.h, info.dpr);
-      if (specsEl) { specsEl.hidden = false; specsEl.textContent = specsStr; }
-
-      if (fam) {
-        if (captionEl) captionEl.textContent = `Detected: ${fam.label}`;
-        downloadTarget = { url: wallpaperURL(fam.file), filename: fam.file };
-      } else {
-        if (captionEl) captionEl.textContent = 'Could not identify device';
-        downloadTarget = { url: wallpaperURL('wallpaper-master.jpg'), filename: 'wallpaper-master.jpg' };
-        if (aux) aux.hidden = false; // ONLY here
-        if (copyBtn) {
-          const clip = `iPhone: unknown • ${cssLabel} • ${nativeLabel} • ${dprLabel} • UA: ${info.ua}`;
-          copyBtn.onclick = async () => {
-            try { await navigator.clipboard.writeText(clip); if (afterCopy) afterCopy.textContent = 'send this to prymus'; }
-            catch { if (afterCopy) afterCopy.textContent = 'copy failed — try again'; }
+    if(info.type==='iPhone'){
+      const fam=matchIPhoneFamily(info.w,info.h,info.dpr);
+      if(specsEl){ specsEl.hidden=false; specsEl.textContent=specsStr; }
+      if(fam){
+        if(captionEl) captionEl.textContent=`Detected: ${fam.label}`;
+        setDownload(fam.file);
+      }else{
+        if(captionEl) captionEl.textContent='Could not identify device';
+        setDownload('wallpaper-master.jpg');
+        if(aux) aux.hidden=false; // ONLY here
+        if(copyBtn){
+          const clip=`iPhone: unknown • ${cssLabel} • ${nativeLabel} • ${dprLabel} • UA: ${info.ua}`;
+          copyBtn.onclick=async ()=>{
+            try{ await navigator.clipboard.writeText(clip); if(afterCopy) afterCopy.textContent='send this to prymus'; }
+            catch{ if(afterCopy) afterCopy.textContent='copy failed — try again'; }
           };
         }
       }
-      if (btn) btn.textContent = 'Download';
-      hasDetected = true;
-      if (container && container.classList.contains('center-stage')) container.classList.remove('center-stage');
-    } else {
-      if (captionEl) captionEl.textContent = (info.type === 'iPad')
-        ? 'iPad support coming soon 👀'
-        : 'This tool is for iPhone. Desktop support coming soon.';
-      downloadTarget = { url: wallpaperURL('wallpaper-master.jpg'), filename: 'wallpaper-master.jpg' };
-      if (btn) btn.textContent = 'Download';
-      hasDetected = true;
-      if (container && container.classList.contains('center-stage')) container.classList.remove('center-stage');
+      hasDetected=true;
+      if(container && container.classList.contains('center-stage')) container.classList.remove('center-stage');
+    }else{
+      if(captionEl) captionEl.textContent=(info.type==='iPad')?'iPad support coming soon 👀':'This tool is for iPhone. Desktop support coming soon.';
+      setDownload('wallpaper-master.jpg');
+      hasDetected=true;
+      if(container && container.classList.contains('center-stage')) container.classList.remove('center-stage');
     }
   }
 
-  if (btn) {
-    btn.addEventListener('click', async () => {
-      if (!hasDetected) runDetection();
-      else await handleDownload();
-    }, { once:false });
+  // First tap: prevent navigation and run detection to set proper href.
+  if(link){
+    link.addEventListener('click', (e)=>{
+      if(!hasDetected){ runDetection(e); }
+      // else let the anchor navigate/download using the set href
+    });
   }
 })();
 </script>
