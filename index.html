@@ -14,31 +14,32 @@
       <div class="thumbnail" id="thumbnail" ondragstart="return false"></div>
     </div>
 
-    <!-- Dynamic caption/specs (hidden until after first tap) -->
+    <!-- Caption/specs (hidden until first tap) -->
     <p class="caption" id="caption" hidden>—</p>
     <p class="specs" id="specs" hidden></p>
 
-    <!-- Primary action: ONLY visible on load; triggers detection -->
+    <!-- Single primary action -->
     <button id="actionBtn" class="btn btn-primary">Get Wallpaper</button>
 
-    <!-- Copy helper: ONLY appears when iPhone is NOT recognized -->
+    <!-- Copy helper ONLY for unknown iPhone -->
     <div class="actions-row" id="auxActions" hidden>
       <button id="copyBtn" class="btn btn-ghost">Copy Screen Size</button>
       <span class="aftercopy" id="afterCopy" aria-live="polite"></span>
     </div>
 
-    <footer class="footer">v1.0.2d • iPhone‑only</footer>
+    <footer class="footer">v1.0.2b</footer>
   </main>
 
 <script>
 /* ============ helpers ============ */
 function wallpaperURL(file) {
+  // Always use local ./wallpaper/ folder next to index.html
   const base = new URL('./wallpaper/', location.href);
   return new URL(file, base).toString();
 }
 function isIPadLike(ua, platform, maxTouch) {
   const looksLikeMac = /Macintosh/i.test(ua) || /Mac/i.test(platform || "");
-  return looksLikeMac && (maxTouch || 0) > 1; // iPadOS posing as Mac
+  return looksLikeMac && (maxTouch || 0) > 1; // iPadOS presenting as Mac
 }
 function getIOSVersion(ua) {
   const m1 = /OS (\d+)[._](\d+)(?:[._](\d+))?/.exec(ua);
@@ -47,10 +48,7 @@ function getIOSVersion(ua) {
   if (m2 && /Safari/i.test(ua)) return [m2[1], m2[2], m2[3]].filter(Boolean).join(".");
   return null;
 }
-function normalizeWH(w, h) {
-  const min = Math.min(w, h), max = Math.max(w, h);
-  return { w:min, h:max };
-}
+function normalizeWH(w, h) { const min = Math.min(w, h), max = Math.max(w, h); return { w:min, h:max }; }
 function approxEqual(a, b, tol=1) { return Math.abs(a-b) <= tol; }
 function canUseDownloadAttr() { const a = document.createElement('a'); return 'download' in a; }
 function downloadOrOpen(url, filename) {
@@ -68,22 +66,19 @@ function detectAppleThing() {
   const platform = (navigator.platform || (navigator.userAgentData && navigator.userAgentData.platform)) || "";
   const maxTouch = navigator.maxTouchPoints || 0;
 
-  let type = null;
+  let type = 'Other';
   if (/iPhone/i.test(ua)) type = "iPhone";
   else if (/iPad/i.test(ua)) type = "iPad";
   else if (isIPadLike(ua, platform, maxTouch)) type = "iPad";
-  else type = "Other";
 
   const osVersion = getIOSVersion(ua) || null;
-
   const dpr = window.devicePixelRatio || 1;
   const { w, h } = normalizeWH(window.screen.width, window.screen.height);
   const nativeW = Math.round(w * dpr), nativeH = Math.round(h * dpr);
-
   return { type, osVersion, w, h, dpr, nativeW, nativeH, ua, maxTouch };
 }
 
-/* ============ iPhone family map (matches your filenames) ============ */
+/* ===== EXACT iPhone family → filename map (matches your folder) ===== */
 const FAMILY_MAP = [
   { w:320, h:568, dpr:2,  file:"iphone-4.0@2x.jpg",         label:'iPhone 4.0″ family' },
   { w:375, h:667, dpr:2,  file:"iphone-4.7@2x.jpg",         label:'iPhone 4.7″ family' },
@@ -99,9 +94,7 @@ const FAMILY_MAP = [
 ];
 function matchIPhoneFamily(w, h, dpr) {
   for (const f of FAMILY_MAP) {
-    if (approxEqual(f.w, w) && approxEqual(f.h, h) && approxEqual(f.dpr, dpr, 0.25)) {
-      return f;
-    }
+    if (approxEqual(f.w, w) && approxEqual(f.h, h) && approxEqual(f.dpr, dpr, 0.25)) return f;
   }
   return null;
 }
@@ -120,7 +113,7 @@ let hasDetected = false;
 let downloadTarget = null;
 
 function runDetection() {
-  // Reveal UI elements after first tap
+  // Reveal UI on first tap
   thumbCard.hidden = false;
   captionEl.hidden = false;
 
@@ -157,7 +150,7 @@ function runDetection() {
     hasDetected = true;
     container.classList.remove('center-stage');
   } else {
-    // iPad or Desktop → master wallpaper (non-supported devices)
+    // iPad or Desktop → master wallpaper
     captionEl.textContent = (info.type === 'iPad')
       ? 'iPad support coming soon 👀'
       : 'This tool is for iPhone. Desktop support coming soon.';

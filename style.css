@@ -16,7 +16,7 @@ html, body {
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
 }
 
-/* v1.0.2b style: centered CTA at load, dark card, rounded preview */
+/* v1.0.2b dark style */
 .container {
   min-height: 100dvh;
   padding: 20px;
@@ -30,7 +30,7 @@ html, body {
 .center-stage {
   display: flex;
   flex-direction: column;
-  justify-content: center; /* vertical center */
+  justify-content: center;
   align-items: center;
 }
 
@@ -44,10 +44,10 @@ html, body {
 
 .thumbnail {
   width: 100%;
-  aspect-ratio: 16 / 9; /* adjust if your art is a different ratio */
+  aspect-ratio: 16 / 9;
   background: center / cover no-repeat url("thumbnail-wallpaper.jpeg");
   border-radius: 10px;
-  /* Hard to save */
+  /* discourage saving */
   -webkit-user-drag: none;
   user-select: none;
   -webkit-user-select: none;
