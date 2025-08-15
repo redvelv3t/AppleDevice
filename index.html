@@ -1,80 +1,207 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Wallpaper Tool v1.0.3</title>
-<link rel="stylesheet" href="style.css">
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Wallpaper Tool v1.0e</title>
+  <link rel="stylesheet" href="style.css" />
+  <meta name="color-scheme" content="light dark">
+</head>
+<body oncontextmenu="return false">
+  <main class="container center-stage" aria-live="polite">
+    <h1 class="title">Wallpaper Tool</h1>
+
+    <!-- Shared thumbnail (hidden until first tap) -->
+    <div class="thumbCard" id="thumbCard" hidden aria-hidden="true">
+      <div class="thumbnail" id="thumbnail" ondragstart="return false"></div>
+    </div>
+
+    <!-- Dynamic caption + specs (hidden until first tap) -->
+    <p class="caption" id="caption" hidden>—</p>
+    <p class="specs" id="specs" hidden></p>
+
+    <!-- Primary action -->
+    <button id="actionBtn" class="btn btn-primary">Get Wallpaper</button>
+
+    <!-- Copy helper ONLY for unknown iPhone -->
+    <div class="actions-row" id="auxActions" hidden>
+      <button id="copyBtn" class="btn btn-ghost">Copy Screen Size</button>
+      <span class="aftercopy" id="afterCopy" aria-live="polite"></span>
+    </div>
+
+    <footer class="footer">v1.0e • mobile‑first</footer>
+  </main>
+
 <script>
-document.addEventListener("DOMContentLoaded", function() {
-    const getBtn = document.getElementById("getWallpaper");
-    const copyBtn = document.getElementById("copySize");
-    const message = document.getElementById("message");
-    const preview = document.getElementById("preview");
+/* =================== CONFIG ===================
+   If GitHub Pages tries to download .jpg.html files, set USE_RAW = true.
+   RAW repo assumed: https://raw.githubusercontent.com/<USERNAME>/<REPO>/<BRANCH>/wallpaper/<file>
+*/
+const CONFIG = {
+  USE_RAW: true, // set to false to use relative ./wallpaper/ paths
+  USERNAME: "redvelv3t",
+  REPO: "redvelv3t.github.io",
+  BRANCH: "main"
+};
 
-    let screenKey = null;
-    let deviceDetected = false;
+/* =================== helpers =================== */
+function baseURL() {
+  if (!CONFIG.USE_RAW) {
+    return new URL('./wallpaper/', location.href).toString();
+  }
+  return `https://raw.githubusercontent.com/${CONFIG.USERNAME}/${CONFIG.REPO}/${CONFIG.BRANCH}/wallpaper/`;
+}
+function fullURL(file) { return baseURL() + file; }
 
-    const wallpapers = {
-        "640x1136": "iphone-4.0@2x.jpg",
-        "750x1334": "iphone-4.7@2x.jpg",
-        "1242x2208": "iphone-5.5@3x.jpg",
-        "1125x2436": "iphone-5.8@3x.jpg",
-        "828x1792": "iphone-6.1-old@2x.jpg",
-        "1242x2688": "iphone-6.5@3x.jpg",
-        "1080x2340": "iphone-5.4@3x.jpg",
-        "1170x2532": "iphone-6.1@3x.jpg",
-        "1284x2778": "iphone-6.7@3x.jpg",
-        "1179x2556": "iphone-6.1-pro@3x.jpg",
-        "1290x2796": "iphone-6.7-pro-max@3x.jpg"
-    };
+function isIPadLike(ua, platform, maxTouch) {
+  const looksLikeMac = /Macintosh/i.test(ua) || /Mac/i.test(platform || "");
+  return looksLikeMac && (maxTouch || 0) > 1; // iPadOS pretending to be Mac
+}
+function getIOSVersion(ua) {
+  const m1 = /OS (\d+)[._](\d+)(?:[._](\d+))?/.exec(ua);
+  if (m1) return [m1[1], m1[2], m1[3]].filter(Boolean).join(".");
+  const m2 = /Version\/(\d+)\.(\d+)(?:\.(\d+))?/.exec(ua);
+  if (m2 && /Safari/i.test(ua)) return [m2[1], m2[2], m2[3]].filter(Boolean).join(".");
+  return null;
+}
+function normalizePortrait(w, h) { return { w: Math.min(w,h), h: Math.max(w,h) }; }
+function approxEqual(a, b, tol=2) { return Math.abs(a-b) <= tol; }
 
-    getBtn.addEventListener("click", function() {
-        if (!deviceDetected) {
-            // Detect screen size
-            const sizeKey = `${window.screen.width * window.devicePixelRatio}x${window.screen.height * window.devicePixelRatio}`;
-            screenKey = wallpapers[sizeKey] ? wallpapers[sizeKey] : "wallpaper-master.jpg";
-            deviceDetected = true;
+function readCSSSize() {
+  const pairs = [
+    [window.screen.width, window.screen.height],
+    [window.innerWidth, window.innerHeight]
+  ];
+  let best = {w:0, h:0};
+  for (const [a,b] of pairs) {
+    if (!a || !b) continue;
+    const {w,h} = normalizePortrait(a,b);
+    if (w*h > best.w*best.h) best = {w, h};
+  }
+  return best;
+}
 
-            // If no match, show Copy Screen Size
-            if (screenKey === "wallpaper-master.jpg") {
-                copyBtn.style.display = "inline-block";
-            }
+function detectAppleThing() {
+  const ua = navigator.userAgent || "";
+  const platform = (navigator.platform || (navigator.userAgentData && navigator.userAgentData.platform)) || "";
+  const maxTouch = navigator.maxTouchPoints || 0;
 
-            // Show preview
-            preview.src = "Wallpaper/" + screenKey;
-            preview.style.display = "block";
-            getBtn.textContent = "Download Wallpaper";
-        } else {
-            // Download
-            const link = document.createElement("a");
-            link.href = "Wallpaper/" + screenKey;
-            if (navigator.userAgent.includes("iPhone") && parseInt((navigator.userAgent.match(/OS (\d+)_/) || [])[1]) >= 11) {
-                link.download = screenKey;
-            }
-            link.target = "_blank";
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
-    });
+  let type = 'Other';
+  if (/iPhone/i.test(ua)) type = "iPhone";
+  else if (/iPad/i.test(ua)) type = "iPad";
+  else if (isIPadLike(ua, platform, maxTouch)) type = "iPad";
 
-    copyBtn.addEventListener("click", function() {
-        const sizeText = `${window.screen.width * window.devicePixelRatio}x${window.screen.height * window.devicePixelRatio}`;
-        navigator.clipboard.writeText(sizeText).then(() => {
-            message.textContent = "Send this to prymus";
-        });
-    });
+  const osVersion = getIOSVersion(ua) || null;
+  const dpr = window.devicePixelRatio || 1;
+  const css = readCSSSize();
+  const nativeW = Math.round(css.w * dpr), nativeH = Math.round(css.h * dpr);
+  return { type, osVersion, w: css.w, h: css.h, dpr, nativeW, nativeH, ua, maxTouch };
+}
+
+/* ===== EXACT filenames in your /wallpaper folder ===== */
+const FAMILY_MAP = [
+  { w:320, h:568, dpr:2,  file:"iphone-4.0@2x.jpg",         label:'iPhone 4.0″ family' },
+  { w:375, h:667, dpr:2,  file:"iphone-4.7@2x.jpg",         label:'iPhone 4.7″ family' },
+  { w:414, h:736, dpr:3,  file:"iphone-5.5@3x.jpg",         label:'iPhone 5.5″ Plus family' },
+  { w:375, h:812, dpr:3,  file:"iphone-5.8@3x.jpg",         label:'iPhone 5.8″ family' },
+  { w:414, h:896, dpr:2,  file:"iphone-6.1-old@2x.jpg",     label:'iPhone 6.1″ (XR/11) family' },
+  { w:414, h:896, dpr:3,  file:"iphone-6.5@3x.jpg",         label:'iPhone 6.5″ family' },
+  { w:360, h:780, dpr:3,  file:"iphone-5.4@3x.jpg",         label:'iPhone 5.4″ mini family' },
+  { w:390, h:844, dpr:3,  file:"iphone-6.1@3x.jpg",         label:'iPhone 6.1″ (12/13/14/15/16) family' },
+  { w:428, h:926, dpr:3,  file:"iphone-6.7@3x.jpg",         label:'iPhone 6.7″ (12–16 Plus/Pro Max) family' },
+  { w:393, h:852, dpr:3,  file:"iphone-6.1-pro@3x.jpg",     label:'iPhone 6.1″ Pro family' },
+  { w:430, h:932, dpr:3,  file:"iphone-6.7-pro-max@3x.jpg", label:'iPhone 6.7″ Pro Max family' },
+];
+
+function matchIPhoneFamily(w, h, dpr) {
+  for (const f of FAMILY_MAP) {
+    if (approxEqual(f.w, w) && approxEqual(f.h, h) && approxEqual(f.dpr, dpr, 0.25)) {
+      return f;
+    }
+  }
+  return null;
+}
+
+function canUseDownloadAttr() { const a = document.createElement('a'); return 'download' in a; }
+
+/* =================== two‑step UI =================== */
+const captionEl = document.getElementById('caption');
+const specsEl   = document.getElementById('specs');
+const thumbCard = document.getElementById('thumbCard');
+const aux       = document.getElementById('auxActions');
+const copyBtn   = document.getElementById('copyBtn');
+const afterCopy = document.getElementById('afterCopy');
+let   action    = document.getElementById('actionBtn');
+const container = document.querySelector('.container');
+
+let hasDetected = false;
+let currentFile = 'wallpaper-master.jpg';
+
+function setActionAsLink(file) {
+  currentFile = file || 'wallpaper-master.jpg';
+  const url = fullURL(currentFile);
+  if (action.tagName.toLowerCase() !== 'a') {
+    const a = document.createElement('a');
+    a.id = 'actionBtn';
+    a.className = action.className || 'btn btn-primary';
+    a.textContent = 'Download Wallpaper';
+    a.setAttribute('role', 'button');
+    action.replaceWith(a);
+    action = a;
+  }
+  action.setAttribute('href', url);
+  action.setAttribute('target', '_blank');
+  action.setAttribute('rel', 'noopener');
+  if (canUseDownloadAttr()) action.setAttribute('download', currentFile);
+  action.textContent = 'Download Wallpaper';
+}
+
+function runDetection(e) {
+  e && e.preventDefault();
+  thumbCard.hidden = false;
+  captionEl.hidden = false;
+
+  const info = detectAppleThing();
+  const cssLabel    = `${info.w}×${info.h} CSS`;
+  const nativeLabel = `${info.nativeW}×${info.nativeH} px`;
+  const dprLabel    = `DPR ${info.dpr}`;
+  const specsStr    = `${cssLabel} • ${nativeLabel} • ${dprLabel}${info.osVersion ? ` • iOS/iPadOS ${info.osVersion}` : ''}`;
+
+  aux.hidden = true;
+  specsEl.hidden = true;
+  afterCopy.textContent = "";
+
+  if (info.type === 'iPhone') {
+    const fam = matchIPhoneFamily(info.w, info.h, info.dpr);
+    specsEl.hidden = false; specsEl.textContent = specsStr;
+
+    if (fam) {
+      captionEl.textContent = `Detected: ${fam.label}`;
+      setActionAsLink(fam.file);
+    } else {
+      captionEl.textContent = 'Could not identify device';
+      setActionAsLink('wallpaper-master.jpg');
+      aux.hidden = false; // ONLY when unknown iPhone
+      const clip = `${info.nativeW}x${info.nativeH}`;
+      copyBtn.onclick = async () => {
+        try { await navigator.clipboard.writeText(clip); afterCopy.textContent = 'send this to prymus'; }
+        catch { afterCopy.textContent = 'copy failed — try again'; }
+      };
+    }
+  } else {
+    captionEl.textContent = (info.type === 'iPad')
+      ? 'iPad support coming soon 👀'
+      : 'This tool is for iPhone. Desktop support coming soon.';
+    setActionAsLink('wallpaper-master.jpg');
+  }
+  hasDetected = true;
+  container.classList.remove('center-stage');
+}
+
+action.addEventListener('click', (e) => {
+  if (!hasDetected) runDetection(e);
+  // else let the anchor do its thing natively
 });
 </script>
-</head>
-<body>
-<div class="container">
-    <h1>Wallpaper Tool</h1>
-    <button id="getWallpaper">Get Wallpaper</button>
-    <button id="copySize" style="display:none;">Copy Screen Size</button>
-    <p id="message"></p>
-    <img id="preview" style="display:none; max-width:80%; margin-top:20px;">
-</div>
 </body>
 </html>
