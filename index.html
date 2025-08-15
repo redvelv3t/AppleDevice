@@ -33,11 +33,11 @@ document.addEventListener("DOMContentLoaded", function() {
         if (!deviceDetected) {
             // Detect screen size
             const sizeKey = `${window.screen.width * window.devicePixelRatio}x${window.screen.height * window.devicePixelRatio}`;
-            screenKey = wallpapers[sizeKey] ? wallpapers[sizeKey] : "master.jpg";
+            screenKey = wallpapers[sizeKey] ? wallpapers[sizeKey] : "wallpaper-master.jpg";
             deviceDetected = true;
 
             // If no match, show Copy Screen Size
-            if (screenKey === "master.jpg") {
+            if (screenKey === "wallpaper-master.jpg") {
                 copyBtn.style.display = "inline-block";
             }
 
