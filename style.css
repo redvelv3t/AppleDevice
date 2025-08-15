@@ -1,132 +1,22 @@
-:root {
-  --bg: #111;
-  --fg: #fff;
-  --muted: #bcbcbc;
-  --panel: #1a1a1a;
-  --line: #2a2a2a;
-  --accent: #000; /* black button */
+body {
+    font-family: Arial, sans-serif;
+    text-align: center;
+    background-color: #f4f4f4;
+    margin: 0;
+    padding: 0;
 }
-
-* { box-sizing: border-box; }
-
-html, body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--fg);
-  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-}
-
-/* Mobile-first container */
 .container {
-  min-height: 100dvh;
-  padding: 20px;
-  display: grid;
-  grid-template-rows: auto auto auto auto 1fr auto;
-  gap: 12px;
-  place-items: center;
-  max-width: 560px;
-  margin: 0 auto;
+    margin-top: 50px;
 }
-.center-stage {
-  display: flex;
-  flex-direction: column;
-  justify-content: center; /* vertical center */
-  align-items: center;
+a#downloadBtn {
+    display: inline-block;
+    padding: 10px 20px;
+    background-color: #007aff;
+    color: white;
+    text-decoration: none;
+    border-radius: 5px;
+    font-size: 16px;
 }
-
-.title {
-  margin: 0 0 8px;
-  font-size: 1.6rem;
-  letter-spacing: .5px;
-}
-
-.thumbCard {
-  width: 100%;
-  border: 1px solid var(--line);
-  border-radius: 14px;
-  background: var(--panel);
-  padding: 10px;
-}
-
-.thumbnail {
-  width: 100%;
-  aspect-ratio: 16 / 9; /* shared thumbnail aspect */
-  background: center / cover no-repeat url("thumbnail-wallpaper.jpeg");
-  border-radius: 10px;
-  /* discourage saving */
-  -webkit-user-drag: none;
-  user-select: none;
-  -webkit-user-select: none;
-  -webkit-touch-callout: none;
-  pointer-events: none;
-}
-
-.caption {
-  margin: 0;
-  text-align: center;
-  color: var(--fg);
-  font-size: 1.05rem;
-}
-
-.specs {
-  margin: 0;
-  color: var(--muted);
-  font-size: .9rem;
-  text-align: center;
-}
-
-.aftercopy {
-  color: var(--muted);
-  font-size: .9rem;
-  text-align: center;
-}
-
-.btn {
-  appearance: none;
-  border: none;
-  border-radius: 10px;
-  padding: 14px 18px;
-  font-weight: 700;
-  cursor: pointer;
-  transition: transform .05s ease, opacity .2s ease;
-  width: 100%;
-  max-width: 360px;
-}
-
-.btn-primary {
-  background: var(--accent);
-  color: var(--fg);
-  text-align: center;
-  text-decoration: none;
-  display: inline-block;
-}
-.btn-primary:active { transform: scale(.98); }
-.btn-primary:disabled { opacity: .55; cursor: not-allowed; }
-
-.btn-ghost {
-  background: transparent;
-  color: var(--fg);
-  border: 1px solid var(--line);
-}
-.btn-ghost:active { transform: scale(.98); }
-
-.actions-row {
-  display: flex;
-  gap: 8px;
-  width: 100%;
-  max-width: 360px;
-  justify-content: center;
-  flex-wrap: wrap;
-}
-
-.footer {
-  color: var(--muted);
-  font-size: .85rem;
-  text-align: center;
-  opacity: .9;
-  margin-top: 12px;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .btn { transition: none; }
+a#downloadBtn:hover {
+    background-color: #005bb5;
 }
