@@ -1,61 +1,94 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Download Wallpaper</title>
+<title>Wallpaper Tool</title>
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="container">
-<h1>Apple Device Wallpaper</h1>
-<p id="message">Detecting your device...</p>
-<a id="downloadBtn" href="#" download>Download</a>
+    <h1>Apple Device Wallpaper Tool</h1>
+    <img id="thumbnail" src="thumbnail-wallpaper.jpeg" alt="Wallpaper Thumbnail" class="hidden">
+    <div id="info" class="hidden"></div>
+    <button id="mainButton">Get Wallpaper</button>
+    <button id="copyButton" class="hidden">Copy Screen Size</button>
+    <div id="copyMsg" class="hidden">send this to prymus.</div>
+    <div class="version">v1.0.2b</div>
 </div>
+
 <script>
-document.addEventListener("DOMContentLoaded", function () {
-    const wallpapers = {
-        "iPhone14,3": "iphone-6.7-pro-max@3x.jpg",
-        "iPhone15,3": "iphone-6.7-pro-max@3x.jpg",
-        "iPhone14,2": "iphone-6.1-pro@3x.jpg",
-        "iPhone15,2": "iphone-6.1-pro@3x.jpg",
-        "iPhone13,4": "iphone-6.7@3x.jpg",
-        "iPhone14,5": "iphone-6.7@3x.jpg",
-        "iPhone14,4": "iphone-5.4@3x.jpg",
-        "iPhone13,2": "iphone-6.1@3x.jpg",
-        "iPhone14,7": "iphone-6.1@3x.jpg",
-        "iPhone11,8": "iphone-6.1-old@2x.jpg",
-        "iPhone8,4": "iphone-4.0@2x.jpg",
-        "iPhone10,1": "iphone-4.7@2x.jpg",
-        "iPhone10,4": "iphone-4.7@2x.jpg",
-        "iPhone10,2": "iphone-5.5@3x.jpg",
-        "iPhone10,5": "iphone-5.5@3x.jpg",
-        "iPhone14,8": "iphone-6.7@3x.jpg"
-    };
+const devices = {
+    "320x568": "iphone5-family.jpg",
+    "375x667": "iphone6-8-family.jpg",
+    "414x736": "iphone6-8-plus-family.jpg",
+    "375x812": "iphoneX-12mini-family.jpg",
+    "390x844": "iphone12-14-family.jpg",
+    "430x932": "iphone14plus-15-family.jpg",
+    "393x852": "iphone14pro-family.jpg",
+    "430x932-pro": "iphone14promax-family.jpg",
+    "402x874": "iphone16-family.jpg"
+};
 
-    const basePath = "https://redvelv3t.github.io/AppleDevice/wallpaper/";
-    const defaultWallpaper = "wallpaper-master.jpg";
+let step = 0;
+const mainButton = document.getElementById("mainButton");
+const copyButton = document.getElementById("copyButton");
+const thumbnail = document.getElementById("thumbnail");
+const info = document.getElementById("info");
+const copyMsg = document.getElementById("copyMsg");
 
-    function getiOSModel() {
-        const ua = navigator.userAgent;
-        const match = ua.match(/iPhone\d+,\d+/);
-        return match ? match[0] : null;
-    }
+function getScreenKey() {
+    return `${window.screen.width}x${window.screen.height}`;
+}
 
-    const model = getiOSModel();
-    const downloadBtn = document.getElementById("downloadBtn");
-    const message = document.getElementById("message");
+mainButton.addEventListener("click", () => {
+    if (step === 0) {
+        const key = getScreenKey();
+        thumbnail.classList.remove("hidden");
+        step = 1;
 
-    if (model && wallpapers[model]) {
-        message.textContent = "Device detected: " + model;
-        downloadBtn.textContent = "Download Wallpaper";
-        downloadBtn.href = basePath + wallpapers[model];
-    } else {
-        message.textContent = "Device not detected. Downloading default wallpaper.";
-        downloadBtn.textContent = "Download Wallpaper";
-        downloadBtn.href = basePath + defaultWallpaper;
+        if (devices[key]) {
+            info.textContent = `Detected device family: ${key}`;
+            mainButton.textContent = "Download";
+            copyButton.classList.add("hidden");
+        } else if (/iPad/.test(navigator.userAgent)) {
+            info.textContent = "iPad support coming soon.";
+            mainButton.textContent = "Download";
+        } else if (!/iPhone|iPod/.test(navigator.userAgent)) {
+            info.textContent = "Desktop support coming soon.";
+            mainButton.textContent = "Download";
+        } else {
+            info.textContent = `Could not identify device. Screen size: ${key}`;
+            copyButton.classList.remove("hidden");
+            mainButton.textContent = "Download";
+        }
+        info.classList.remove("hidden");
+    } else if (step === 1) {
+        const key = getScreenKey();
+        let fileName = devices[key];
+        if (fileName) {
+            triggerDownload(`wallpaper/${fileName}`);
+        } else {
+            window.open("wallpaper/wallpaper-master.jpg", "_blank");
+        }
     }
 });
+
+copyButton.addEventListener("click", () => {
+    navigator.clipboard.writeText(getScreenKey()).then(() => {
+        copyMsg.classList.remove("hidden");
+    });
+});
+
+function triggerDownload(url) {
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = url.split("/").pop();
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+}
 </script>
 </body>
 </html>
