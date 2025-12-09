@@ -1,95 +1,88 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Wallpaper Tool</title>
-<link rel="stylesheet" href="style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wallpaper Tool</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<div class="container">
-    <h1>Apple Device Wallpaper Tool</h1>
-    <img id="thumbnail" src="thumbnail-wallpaper.jpeg" alt="Wallpaper Thumbnail" class="hidden">
-    <div id="info" class="hidden"></div>
-    <button id="mainButton">Get Wallpaper</button>
-    <button id="copyButton" class="hidden">Copy Screen Size</button>
-    <div id="copyMsg" class="hidden">send this to prymus.</div>
-    <div class="version">v1.0.2b</div>
-</div>
+  <div class="container">
+    <h1>Apple Device Wallpaper Tool</h1>
+    <p>Select your iPhone model base and download the matching wallpaper.</p>
 
-<script>
-const devices = {
-    "320x568": "iphone5-family.jpg",
-    "375x667": "iphone6-8-family.jpg",
-    "414x736": "iphone6-8-plus-family.jpg",
-    "375x812": "iphoneX-12mini-family.jpg",
-    "390x844": "iphone12-14-family.jpg",
-    "430x932": "iphone14plus-15-family.jpg",
-    "393x852": "iphone14pro-family.jpg",
-    "430x932-pro": "iphone14promax-family.jpg",
-    "402x874": "iphone16-family.jpg"
-    "428x926": "iphone13promax-family.jpg"
-};
+    <div class="select-wrapper">
+      <label for="deviceSelect">iPhone model base</label>
+      <select id="deviceSelect">
+        <option value="">Select your iPhone</option>
+        <option value="iphone5-family.jpg">iPhone 5 / 5s / SE (1st gen)</option>
+        <option value="iphone6-8-family.jpg">iPhone 6 / 6s / 7 / 8</option>
+        <option value="iphone6-8-plus-family.jpg">iPhone 6 Plus / 6s Plus / 7 Plus / 8 Plus</option>
+        <option value="iphoneX-12mini-family.jpg">iPhone X / XS / 11 Pro / 12 mini</option>
+        <option value="iphone12-14-family.jpg">iPhone 12 / 13 / 14 (base)</option>
+        <option value="iphone13promax-family.jpg">iPhone 13 Pro Max</option>
+        <option value="iphone14plus-15-family.jpg">iPhone 14 Plus / 15 / 15 Plus / 15 Pro Max</option>
+        <option value="iphone14pro-family.jpg">iPhone 14 Pro</option>
+        <option value="iphone16-family.jpg">iPhone 16 / 16 base family</option>
+      </select>
+    </div>
 
-let step = 0;
-const mainButton = document.getElementById("mainButton");
-const copyButton = document.getElementById("copyButton");
-const thumbnail = document.getElementById("thumbnail");
-const info = document.getElementById("info");
-const copyMsg = document.getElementById("copyMsg");
+    <img
+      id="thumbnail"
+      src="thumbnail-wallpaper.jpeg"
+      alt="Wallpaper Thumbnail"
+      class="hidden"
+    >
 
-function getScreenKey() {
-    return `${window.screen.width}x${window.screen.height}`;
-}
+    <div id="info" class="hidden"></div>
 
-mainButton.addEventListener("click", () => {
-    if (step === 0) {
-        const key = getScreenKey();
-        thumbnail.classList.remove("hidden");
-        step = 1;
+    <button id="downloadButton">Download Wallpaper</button>
 
-        if (devices[key]) {
-            info.textContent = `Detected device family: ${key}`;
-            mainButton.textContent = "Download";
-            copyButton.classList.add("hidden");
-        } else if (/iPad/.test(navigator.userAgent)) {
-            info.textContent = "iPad support coming soon.";
-            mainButton.textContent = "Download";
-        } else if (!/iPhone|iPod/.test(navigator.userAgent)) {
-            info.textContent = "Desktop support coming soon.";
-            mainButton.textContent = "Download";
-        } else {
-            info.textContent = `Could not identify device. Screen size: ${key}`;
-            copyButton.classList.remove("hidden");
-            mainButton.textContent = "Download";
-        }
-        info.classList.remove("hidden");
-    } else if (step === 1) {
-        const key = getScreenKey();
-        let fileName = devices[key];
-        if (fileName) {
-            triggerDownload(`wallpaper/${fileName}`);
-        } else {
-            window.open("wallpaper/wallpaper-master.jpg", "_blank");
-        }
-    }
-});
+    <div class="version">v1.1.0</div>
+  </div>
 
-copyButton.addEventListener("click", () => {
-    navigator.clipboard.writeText(getScreenKey()).then(() => {
-        copyMsg.classList.remove("hidden");
-    });
-});
+  <script>
+    const deviceSelect = document.getElementById("deviceSelect");
+    const downloadButton = document.getElementById("downloadButton");
+    const thumbnail = document.getElementById("thumbnail");
+    const info = document.getElementById("info");
 
-function triggerDownload(url) {
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = url.split("/").pop();
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-}
-</script>
+    function triggerDownload(url) {
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = url.split("/").pop();
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    deviceSelect.addEventListener("change", () => {
+      const selectedValue = deviceSelect.value;
+      const selectedText =
+        deviceSelect.options[deviceSelect.selectedIndex]?.text || "";
+
+      if (selectedValue) {
+        info.textContent = `Selected: ${selectedText}`;
+        info.classList.remove("hidden");
+        thumbnail.classList.remove("hidden");
+      } else {
+        info.classList.add("hidden");
+        thumbnail.classList.add("hidden");
+      }
+    });
+
+    downloadButton.addEventListener("click", () => {
+      const fileName = deviceSelect.value;
+
+      if (!fileName) {
+        info.textContent = "Please select your iPhone model first.";
+        info.classList.remove("hidden");
+        return;
+      }
+
+      const url = `wallpaper/${fileName}`;
+      triggerDownload(url);
+    });
+  </script>
 </body>
 </html>
